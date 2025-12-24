@@ -63,10 +63,10 @@ def private_key_to_address(private_key_bytes):
     return address
 
 def check_address(address, prefix, suffix):
-    """检查地址是否匹配"""
-    if prefix and not address[1:1+len(prefix)].lower() == prefix.lower():
+    """检查地址是否匹配（区分大小写）"""
+    if prefix and address[1:1+len(prefix)] != prefix:
         return False
-    if suffix and not address[-len(suffix):].lower() == suffix.lower():
+    if suffix and address[-len(suffix):] != suffix:
         return False
     return True
 
@@ -74,9 +74,7 @@ def worker(worker_id, prefix, suffix, result_queue, stats_queue):
     """工作进程"""
     count = 0
     
-    # 预编译检查条件
-    prefix_lower = prefix.lower() if prefix else ""
-    suffix_lower = suffix.lower() if suffix else ""
+    # 预编译检查条件（区分大小写）
     prefix_len = len(prefix) if prefix else 0
     suffix_len = len(suffix) if suffix else 0
     
@@ -89,13 +87,13 @@ def worker(worker_id, prefix, suffix, result_queue, stats_queue):
             address = private_key_to_address(private_key)
             count += 1
             
-            # 快速检查是否匹配
+            # 快速检查是否匹配（区分大小写）
             match = True
             if prefix_len > 0:
-                if address[1:1+prefix_len].lower() != prefix_lower:
+                if address[1:1+prefix_len] != prefix:
                     match = False
             if match and suffix_len > 0:
-                if address[-suffix_len:].lower() != suffix_lower:
+                if address[-suffix_len:] != suffix:
                     match = False
             
             if match:
