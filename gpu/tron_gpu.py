@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-TRON GPU 虚荣地址生成器
-使用 CUDA 加速的高性能版本
+TRON 虚荣地址生成器 - 高性能多进程版本
 """
 
 import os
@@ -9,32 +8,27 @@ import sys
 import time
 import hashlib
 import multiprocessing as mp
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# 尝试导入 GPU 库
+# 尝试导入依赖
 try:
-    import numpy as np
     from ecdsa import SECP256k1, SigningKey
-    from ecdsa.util import randrange_from_seed__trytryagain
     import base58
-except ImportError:
-    print("请安装依赖: pip3 install numpy ecdsa base58")
+    import sha3  # pysha3
+except ImportError as e:
+    print(f"缺少依赖: {e}")
+    print("请安装: pip3 install ecdsa base58 pysha3 --user")
     sys.exit(1)
 
 # ======== 配置 ========
 PREFIX = "MGf"  # 前缀（不含 T）
 SUFFIX = "fqq"  # 后缀
 TARGET_COUNT = 1  # 要找的地址数量
-NUM_WORKERS = mp.cpu_count() * 2  # 工作线程数
-BATCH_SIZE = 1000  # 每批处理数量
+NUM_WORKERS = mp.cpu_count()  # 工作进程数
 # ======================
 
 def keccak256(data):
     """Keccak256 哈希"""
-    from Crypto.Hash import keccak
-    k = keccak.new(digest_bits=256)
-    k.update(data)
-    return k.digest()
+    return sha3.keccak_256(data).digest()
 
 def sha256(data):
     """SHA256 哈希"""
@@ -79,33 +73,46 @@ def check_address(address, prefix, suffix):
 def worker(worker_id, prefix, suffix, result_queue, stats_queue):
     """工作进程"""
     count = 0
-    found = 0
+    
+    # 预编译检查条件
+    prefix_lower = prefix.lower() if prefix else ""
+    suffix_lower = suffix.lower() if suffix else ""
+    prefix_len = len(prefix) if prefix else 0
+    suffix_len = len(suffix) if suffix else 0
     
     while True:
-        # 生成随机私钥
-        private_key = os.urandom(32)
-        
         try:
+            # 生成随机私钥
+            private_key = os.urandom(32)
+            
             # 生成地址
             address = private_key_to_address(private_key)
             count += 1
             
-            # 检查是否匹配
-            if check_address(address, prefix, suffix):
+            # 快速检查是否匹配
+            match = True
+            if prefix_len > 0:
+                if address[1:1+prefix_len].lower() != prefix_lower:
+                    match = False
+            if match and suffix_len > 0:
+                if address[-suffix_len:].lower() != suffix_lower:
+                    match = False
+            
+            if match:
                 result_queue.put({
                     'address': address,
                     'private_key': private_key.hex(),
                     'worker_id': worker_id
                 })
-                found += 1
             
-            # 每 10000 次报告统计
-            if count % 10000 == 0:
+            # 每 5000 次报告统计
+            if count % 5000 == 0:
                 stats_queue.put(count)
                 count = 0
                 
         except Exception as e:
-            pass
+            # 忽略无效私钥
+            continue
 
 def main():
     print("\n===== TRON GPU 虚荣地址生成器 =====")
