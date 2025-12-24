@@ -18,9 +18,9 @@ const REPORT_INTERVAL = 5000; // 报告间隔（毫秒）
 
 // ======== 靓号配置 ========
 // 前缀配置（不含固定的 T，例如想要 TMG 开头就填 "MG"）
-const PREFIX = 'MGf';
+const PREFIX = '';
 // 后缀配置
-const SUFFIX = 'fqq';
+const SUFFIX = '8888888';
 // =========================
 
 // Base58 字符集
