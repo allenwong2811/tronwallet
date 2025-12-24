@@ -4,6 +4,7 @@ const cluster = require('cluster');
 const readline = require('readline');
 const os = require('os');
 const crypto = require('crypto');
+const https = require('https');
 const secp256k1 = require('secp256k1');
 const createKeccakHash = require('keccak');
 
@@ -22,6 +23,59 @@ const PREFIX = 'MGf';
 // 后缀配置
 const SUFFIX = 'fqq';
 // =========================
+
+// ======== Telegram 配置 ========
+// 1. 通过 @BotFather 创建 Bot，获取 Token
+// 2. 通过 @userinfobot 获取你的 Chat ID
+const TELEGRAM_BOT_TOKEN = '8399772991:AAG1aerIToqyfqSiejljChAc5R2Ds4YV6lM'; // 填入你的 Bot Token
+const TELEGRAM_CHAT_ID = '1241037562';   // 填入你的 Chat ID
+const TELEGRAM_ENABLED = TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID; // 自动检测是否启用
+// ===============================
+
+// 发送 Telegram 消息
+function sendTelegramMessage(message) {
+  if (!TELEGRAM_ENABLED) return Promise.resolve();
+  
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text: message,
+      parse_mode: 'HTML'
+    });
+    
+    const options = {
+      hostname: 'api.telegram.org',
+      port: 443,
+      path: `/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data)
+      }
+    };
+    
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          resolve(body);
+        } else {
+          console.error('Telegram 发送失败:', body);
+          reject(new Error(body));
+        }
+      });
+    });
+    
+    req.on('error', (e) => {
+      console.error('Telegram 请求错误:', e.message);
+      reject(e);
+    });
+    
+    req.write(data);
+    req.end();
+  });
+}
 
 // Base58 字符集
 const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -165,6 +219,19 @@ function saveToFile(address, privateKey, suffix, stats = null) {
   fs.appendFileSync(resultsFile, content);
   console.log(`\n成功！找到地址: ${address}`);
   console.log(`结果已保存至: ${resultsFile}`);
+  
+  // 发送 Telegram 通知
+  if (TELEGRAM_ENABLED) {
+    const telegramMsg = `🎉 <b>找到靓号地址!</b>\n\n` +
+      `<b>模式:</b> ${suffix}\n` +
+      `<b>地址:</b>\n<code>${address}</code>\n\n` +
+      `<b>私钥:</b>\n<code>${privateKey}</code>\n\n` +
+      `⏰ ${new Date().toLocaleString()}`;
+    
+    sendTelegramMessage(telegramMsg)
+      .then(() => console.log('✅ 已发送到 Telegram'))
+      .catch(err => console.error('❌ Telegram 发送失败:', err.message));
+  }
 }
 
 // 工作进程的主函数
@@ -226,7 +293,8 @@ if (cluster.isPrimary) {
   console.log(`\n===== 波场靓号地址生成器 =====`);
   console.log(`前缀: T${prefix || '(无)'}`);
   console.log(`后缀: ${suffix || '(无)'}`);
-  console.log(`预计概率: 1/${probability.toLocaleString()} (约 ${(probability / 1000000).toFixed(1)}M 次)\n`);
+  console.log(`预计概率: 1/${probability.toLocaleString()} (约 ${(probability / 1000000).toFixed(1)}M 次)`);
+  console.log(`Telegram 通知: ${TELEGRAM_ENABLED ? '✅ 已启用' : '❌ 未配置'}\n`);
   
   rl.question('请输入要查找的地址数量 (输入0表示无限制，默认1): ', (targetCount) => {
     const targetAddressCount = parseInt(targetCount, 10) || 1;
