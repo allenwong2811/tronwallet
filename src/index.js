@@ -18,9 +18,9 @@ const REPORT_INTERVAL = 5000; // 报告间隔（毫秒）
 
 // ======== 靓号配置 ========
 // 前缀配置（不含固定的 T，例如想要 TMG 开头就填 "MG"）
-const PREFIX = '';
+const PREFIX = 'MGf';
 // 后缀配置
-const SUFFIX = '8888888';
+const SUFFIX = 'fqq';
 // =========================
 
 // Base58 字符集
@@ -108,16 +108,16 @@ function formatTime(seconds) {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
-// 函数：检查地址是否匹配前缀和后缀
+// 函数：检查地址是否匹配前缀和后缀（区分大小写）
 function checkAddress(address, prefix, suffix) {
   if (!address || typeof address !== 'string') return false;
   
   try {
     // 地址格式：T + 33个字符
-    // 前缀检查（不含 T）
-    const prefixMatch = !prefix || address.substring(1, 1 + prefix.length).toLowerCase() === prefix.toLowerCase();
-    // 后缀检查
-    const suffixMatch = !suffix || address.slice(-suffix.length).toLowerCase() === suffix.toLowerCase();
+    // 前缀检查（不含 T，区分大小写）
+    const prefixMatch = !prefix || address.substring(1, 1 + prefix.length) === prefix;
+    // 后缀检查（区分大小写）
+    const suffixMatch = !suffix || address.slice(-suffix.length) === suffix;
     
     return prefixMatch && suffixMatch;
   } catch (e) {
